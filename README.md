@@ -1,4 +1,3 @@
-
 # ARSW — (Java 21): **Immortals & Synchronization** — con UI Swing
 
 **Escuela Colombiana de Ingeniería – Arquitecturas de Software**  
@@ -159,6 +158,99 @@ mvn clean verify
 Incluye compilación y pruebas JUnit.
 
 ---
+## Informe del Laboratorio
+
+### Parte I — Productor/Consumidor
+
+1. **Ejecuta el programa de productor/consumidor y monitorea CPU con jVisualVM. ¿Por qué el consumo alto? ¿Qué clase lo causa?**
+
+De acuerdo con el monitoreo, el consumo alto de CPU se debe a la implementación de **busy-wait** en la clase `BusySpinQueue`, donde los hilos productores y consumidores están constantemente verificando el estado del buffer sin ceder el control, lo que genera un uso intensivo de CPU.
+
+```java
+public void put(T item) {
+    // spin hasta que haya espacio
+    while (true) {
+        if (q.size() < capacity) {
+            q.addLast(item);
+            return;
+        }
+        // espera activa
+        Thread.onSpinWait();
+    }
+}
+
+public T take() {
+    // spin hasta que haya elementos
+    while (true) {
+        T v = q.pollFirst();
+        if (v != null)
+            return v;
+        Thread.onSpinWait();
+    }
+}
+```
+
+Como se puede observar, ambos métodos `put` y `take` utilizan un bucle infinito para verificar constantemente el estado del buffer, lo que resulta en un alto consumo de CPU.
+
+#### Ejemplo de consumo de CPU (jVisualVM)
+
+- ![Consumo de CPU antes de optimización](img/Screenshot%202026-02-06%20174107.png)
+- ![Consumo de CPU antes de optimización](img/Screenshot%202026-02-06%20174114.png)
+
+2. **Ajusta la implementación para usar CPU eficientemente cuando el productor es lento y el consumidor es rápido. Valida de nuevo con VisualVM.**
+
+    Para optimizar el uso de CPU, se implementa una clase llamada `BoundedBuffer` utilizando **monitores** con `wait()` y `notifyAll()`. Esto permite a los hilos productores y consumidores esperar de manera eficiente sin consumir CPU mientras esperan.
+
+    ```java
+    public void put(T item) throws InterruptedException {
+        synchronized (this) {
+            while (q.size() == capacity) {
+                this.wait(); // espera hasta que haya espacio
+            }
+            q.addLast(item);
+            this.notifyAll(); // despierta consumidores
+        }
+    }
+
+    public T take() throws InterruptedException {
+        synchronized (this) {
+            while (q.isEmpty()) {
+                this.wait(); // espera hasta que haya elementos
+            }
+            T v = q.removeFirst();
+            this.notifyAll(); // despierta productores
+            return v;
+        }
+    }
+    ```
+
+    Como resultado, el consumo de CPU disminuye notablemente, ya que los hilos solo se activan cuando hay cambios en el buffer, evitando la espera activa.
+    Además,por defecto el productor tiene un delay de 50ms, mientras que el consumidor tiene un delay de 1ms, lo que hace que el productor sea lento y el consumidor rápido, validando así el escenario planteado. En este caso se disminuyó el delay del productor a 30ms para aumentar la diferencia entre ambos y evidenciar mejor el consumo de CPU.
+    
+    #### Ejemplo de consumo de CPU tras optimización (jVisualVM)
+    
+    - ![Consumo de CPU después de optimización](img/Screenshot%202026-02-06%20175852.png)
+    - ![Consumo de CPU después de optimización](img/Screenshot%202026-02-06%20175901.png)
+3.  **Ahora productor rápido y consumidor lento con límite de stock (cola acotada): garantiza que el límite se respete sin espera activa y valida CPU con un stock pequeño.**
+
+Para este escenario, se mantiene la implementación de `BoundedBuffer` con monitores. Se ajustan los delays para que el productor sea rápido (1ms) y el consumidor lento (50ms), y se establece una capacidad pequeña para el buffer.
+
+```java
+String mode = System.getProperty("mode", "monitor"); // monitor|spin
+int producers = Integer.getInteger("producers", 1);
+int consumers = Integer.getInteger("consumers", 1);
+int capacity = Integer.getInteger("capacity", 8);
+long prodDelay = Long.getLong("prodDelayMs", 1);
+long consDelay = Long.getLong("consDelayMs", 50);
+int duration = Integer.getInteger("durationSec", 3);
+```
+
+Al ejecutar el programa con estos parámetros, se observa que el productor respeta el límite de stock sin utilizar espera activa, y el consumo de CPU sigue siendo eficiente. Además, al finalizar el programa hay elementos que se quedaron en el buffer, lo que indica que el productor fue más rápido que el consumidor.
+
+#### Ejemplo de consumo de CPU con stock pequeño y elementos en Buffer
+
+- ![Elementos en el Buffer](img.png)
+- ![Bajo consumo de CPU](img_1.png)
 
 ## Créditos y licencia
 
