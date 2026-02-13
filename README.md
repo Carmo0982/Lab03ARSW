@@ -1,4 +1,3 @@
-
 # ARSW — (Java 21): **Immortals & Synchronization** — con UI Swing
 
 **Escuela Colombiana de Ingeniería – Arquitecturas de Software**  
@@ -159,7 +158,6 @@ mvn clean verify
 Incluye compilación y pruebas JUnit.
 
 ---
-
 ## Créditos y licencia
 
 Laboratorio basado en el enunciado histórico del curso (Highlander, Productor/Consumidor, Búsqueda distribuida), modernizado a **Java 21**.  
