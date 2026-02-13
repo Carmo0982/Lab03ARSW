@@ -5,12 +5,13 @@ import edu.eci.arsw.concurrency.PauseController;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 public final class ImmortalManager implements AutoCloseable {
-  private final List<Immortal> population = new ArrayList<>();
+  private final List<Immortal> population = new CopyOnWriteArrayList<>();
   private final List<Future<?>> futures = new ArrayList<>();
   private final PauseController controller = new PauseController();
   private final ScoreBoard scoreBoard = new ScoreBoard();
@@ -58,6 +59,26 @@ public final class ImmortalManager implements AutoCloseable {
     long sum = 0;
     for (Immortal im : population) sum += im.getHealth();
     return sum;
+  }
+
+  public int removeDeadImmortals() {
+    int removed = 0;
+    List<Immortal> toRemove = new ArrayList<>();
+    for (Immortal im : population) {
+      if (!im.isAlive()) {
+        toRemove.add(im);
+      }
+    }
+    for (Immortal im : toRemove) {
+      if (population.remove(im)) {
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  public int populationSize() {
+    return population.size();
   }
 
   public List<Immortal> populationSnapshot() {

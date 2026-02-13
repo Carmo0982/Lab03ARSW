@@ -47,18 +47,41 @@ public final class Immortal implements Runnable {
   }
 
   private Immortal pickOpponent() {
-    if (population.size() <= 1) return null;
-    Immortal other;
-    do {
-      other = population.get(ThreadLocalRandom.current().nextInt(population.size()));
-    } while (other == this);
-    return other;
+    int size = population.size();
+    if (size <= 1) return null;
+    int attempts = 0;
+    int maxAttempts = Math.min(10, size * 2);
+
+    while (attempts < maxAttempts) {
+      try {
+        int index = ThreadLocalRandom.current().nextInt(size);
+        Immortal other = population.get(index);
+
+        if (other != this && other.isAlive()) {
+          return other;
+        }
+      } catch (IndexOutOfBoundsException e) {
+        size = population.size();
+        if (size <= 1) return null;
+      }
+      attempts++;
+    }
+
+    for (Immortal im : population) {
+      if (im != this && im.isAlive()) {
+        return im;
+      }
+    }
+
+    return null;
   }
 
   private void fightNaive(Immortal other) {
     synchronized (this) {
       synchronized (other) {
         if (this.health <= 0 || other.health <= 0) return;
+        if (other.health < this.damage) return;
+
         other.health -= this.damage;
         this.health += this.damage / 2;
         scoreBoard.recordFight();
@@ -72,6 +95,8 @@ public final class Immortal implements Runnable {
     synchronized (first) {
       synchronized (second) {
         if (this.health <= 0 || other.health <= 0) return;
+        if (other.health < this.damage) return; // No atacar si quedaría negativo
+
         other.health -= this.damage;
         this.health += this.damage / 2;
         scoreBoard.recordFight();
